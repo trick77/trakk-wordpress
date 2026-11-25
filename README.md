@@ -32,7 +32,7 @@ Without settings it loads nothing and sends nothing.
    Leave `/wp-content/` and `/wp-includes/` without a rule: which plugin's files a scanner asks for is the clue.
 2. Install the ZIP of the [latest release](https://github.com/trick77/trakk-wordpress/releases) under Plugins → Add
    Plugin → Upload. WordPress 6.5 and PHP 8.1 or newer.
-3. Settings → Trakk: the URL alone turns on the script; site and feed key add the feed. **Test connection** asks Trakk
+3. Settings → Trakk (on a network: for super admins, the URL becomes a script on every page): the URL alone turns on the script; site and feed key add the feed. **Test connection** asks Trakk
    about what the form holds, before anything is saved.
 
 ### Behind a proxy
@@ -60,7 +60,8 @@ image resolves it already (mod_remoteip): leave 0. The FPM image does not.
 A request is written to a small table after WordPress is done with it, 5000 rows at most, and sent to Trakk at once
 where PHP can go on after the answer (FPM, LiteSpeed). Under mod_php WP-Cron sends, within a minute or so while the
 site has visitors; on a quiet one the last requests wait for the next visit. What was not delivered within 55 minutes
-is dropped: Trakk would date it wrongly. A system cron on `wp-cron.php` every few minutes prevents that.
+is dropped: Trakk would date it wrongly. A system cron on `wp-cron.php` every few minutes prevents that. On FPM and
+LiteSpeed WP-Cron only picks up what a failure left behind.
 
 If Trakk is down, the site does not notice. Signed-in users are reported as `u_<id>`, never by name or address.
 

@@ -31,15 +31,14 @@ final class Recorder
             return;
         }
         $r = new self($settings);
-        if (is_local($r->server, $settings->hops)) {
+        if (is_local($r->server)) {
             return; // a local health check, a system cron on wp-cron.php
         }
         add_filter('determine_current_user', [$r, 'resolved'], PHP_INT_MAX);
         add_action('wp_login_failed', [$r, 'login_failed']);
         add_action('xmlrpc_call', [$r, 'xmlrpc_call']);
-        if (!finishes()) {
-            add_action('shutdown', [$r->queue, 'schedule'], PHP_INT_MAX);
-        }
+        // Before anything is sent: WordPress rewrites the whole list of cron events from what this request read.
+        add_action('shutdown', [$r->queue, 'schedule'], PHP_INT_MAX);
         // Registered again from within: last, so what other plugins do after the answer never waits for Trakk.
         register_shutdown_function(static function () use ($r): void {
             register_shutdown_function([$r, 'shutdown']);
@@ -95,9 +94,6 @@ final class Recorder
             $this->queue->add($event);
             if ($later) {
                 $this->queue->send($this->settings);
-                if ($this->queue->paused_until() > time()) {
-                    $this->queue->schedule(); // on a quiet site no request may come to try again
-                }
             }
         } catch (\Throwable) {
             return; // the request is answered or on its way: nothing here may show
@@ -183,8 +179,8 @@ function cron_send(): void
         return;
     }
     $queue = new Queue();
-    $queue->send($settings);
     if ($queue->length() > 0) {
         $queue->schedule();
+        $queue->send($settings);
     }
 }
