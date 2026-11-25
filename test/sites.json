@@ -1,0 +1,18 @@
+{
+  "sites": [
+    {
+      "domain": "apache.wp.test",
+      "product": "WordPress",
+      "kind": "site",
+      "feed_key_sha256": "68a7ca983e2944121c5824b97807bba4db715350cfb0a7df957298f9821acee6",
+      "path_rules": []
+    },
+    {
+      "domain": "fpm.wp.test",
+      "product": "WordPress",
+      "kind": "site",
+      "feed_key_sha256": "113892e020a14102ac80f0906c2b8bb514c7a187aca4b347b74d636a7ec1d5c7",
+      "path_rules": []
+    }
+  ]
+}

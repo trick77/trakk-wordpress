@@ -2,3 +2,6 @@
 .DS_Store
 *.zip
 /test/data/
+/vendor/
+/wordpress/
+/.cache/
