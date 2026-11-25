@@ -21,7 +21,7 @@ x-wordpress: &wordpress
 
 services:
   db:
-    image: mariadb:11.8
+    image: mariadb:13.0
     environment:
       MARIADB_DATABASE: wp
       MARIADB_USER: wp
