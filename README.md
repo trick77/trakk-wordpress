@@ -13,7 +13,7 @@ Without settings it loads nothing on the pages and sends nothing about visitors.
 
 1. On the Trakk server, list the site in `sites.json` and create a feed key
    (`docker compose run --rm trakk -new-feed-key`), then restart Trakk. `domain` is the exact host of the pages: with
-   and without `www` are two sites. A start for a WordPress site:
+   and without `www` are two sites, the settings page names yours. A start for a WordPress site:
 
    ```json
    {
@@ -32,8 +32,12 @@ Without settings it loads nothing on the pages and sends nothing about visitors.
    Leave `/wp-content/` and `/wp-includes/` without a rule: which plugin's files a scanner asks for is the clue.
 2. Install the ZIP of the [latest release](https://github.com/trick77/trakk-wordpress/releases) under Plugins → Add
    Plugin → Upload. WordPress 6.5 and PHP 8.1 or newer.
-3. Settings → Trakk (on a network: for super admins, the URL becomes a script on every page): the URL alone turns on the script; site and feed key add the feed. **Test connection** asks Trakk
-   about what the form holds, before anything is saved.
+3. Settings → Trakk (on a network: for super admins, the URL becomes a script on every page): the URL alone turns on the
+   script, the feed key adds the feed. **Test connection** asks Trakk about what the form holds, before anything is
+   saved.
+
+The plugin needs a Trakk whose feed takes a batch without `site`; an older one refuses it, and what it refuses is
+dropped. Update Trakk first.
 
 ### Updates
 

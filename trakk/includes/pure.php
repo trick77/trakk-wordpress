@@ -8,7 +8,7 @@ namespace Trakk;
 
 defined('ABSPATH') || exit;
 
-// Trakk refuses a batch over 500 events or 256 KiB; the envelope and its site name fit in the difference.
+// Trakk refuses a batch over 500 events or 256 KiB; the envelope fits in the difference.
 const BATCH_EVENTS = 500;
 const BATCH_BYTES = 240 * 1024;
 // Trakk dates an event more than an hour old on receipt, a spike at the wrong time: an older one is dropped instead.
@@ -215,13 +215,13 @@ function encode_event(array $e): string
 }
 
 /**
- * The batch of the first rows that fit: [ids, body]. A row that is no JSON object would refuse the batch: its id is
- * taken along, its body left out.
+ * The batch of the first rows that fit: [ids, body]. Whose it is the key says. A row that is no JSON object would
+ * refuse the batch: its id is taken along, its body left out.
  *
  * @param list<array{id: string, body: string}> $rows
  * @return array{list<int>, string}
  */
-function batch(string $site, array $rows): array
+function batch(array $rows): array
 {
     $ids = [];
     $bodies = [];
@@ -237,7 +237,7 @@ function batch(string $site, array $rows): array
             $size += strlen($body) + 1;
         }
     }
-    return [$ids, '{"v":1,"site":' . json_encode($site) . ',"events":[' . implode(',', $bodies) . ']}'];
+    return [$ids, '{"v":1,"events":[' . implode(',', $bodies) . ']}'];
 }
 
 /**
@@ -281,15 +281,6 @@ function origin_of(string $s): ?string
 }
 
 /**
- * A hostname as Trakk's sites.json takes it, null when it is none.
- */
-function domain_of(string $s): ?string
-{
-    $s = strtolower(trim($s));
-    return preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $s) ? $s : null;
-}
-
-/**
  * The plugin's settings, whatever the stored option holds.
  */
 final class Settings
@@ -298,7 +289,6 @@ final class Settings
 
     public function __construct(
         public readonly string $url = '',
-        public readonly string $site = '',
         public readonly string $key = '',
         public readonly int $hops = 0,
     ) {}
@@ -310,7 +300,6 @@ final class Settings
         $hops = $o['hops'] ?? 0;
         return new self(
             $text('url'),
-            $text('site'),
             $text('key'),
             max(0, min(self::HOPS_MAX, is_numeric($hops) ? (int) $hops : 0)),
         );
@@ -322,19 +311,19 @@ final class Settings
     }
 
     /**
-     * The server feed needs all three.
+     * The server feed needs both.
      */
     public function feed(): bool
     {
-        return $this->url !== '' && $this->site !== '' && $this->key !== '';
+        return $this->url !== '' && $this->key !== '';
     }
 
     /**
-     * @return array{url: string, site: string, key: string, hops: int}
+     * @return array{url: string, key: string, hops: int}
      */
     public function option(): array
     {
-        return ['url' => $this->url, 'site' => $this->site, 'key' => $this->key, 'hops' => $this->hops];
+        return ['url' => $this->url, 'key' => $this->key, 'hops' => $this->hops];
     }
 }
 

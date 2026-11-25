@@ -69,10 +69,6 @@ function settings_read(mixed $form, Settings $old): array
     if ($url === null) {
         $faults['url'] = 'The Trakk URL is an origin, such as https://trakk.example.com, without a path.';
     }
-    $site = $text('site') === '' ? '' : domain_of($text('site'));
-    if ($site === null) {
-        $faults['site'] = 'The site is a hostname, such as www.example.com.';
-    }
     $key = $text('key');
     if ($key === '') {
         $key = $text('key_clear') === '' ? $old->key : '';
@@ -94,13 +90,13 @@ function settings_read(mixed $form, Settings $old): array
         $faults['hops'] = 'Trusted proxies is a number from 0 to ' . Settings::HOPS_MAX . '.';
     }
     return [
-        new Settings($url ?? $old->url, $site ?? $old->site, $key, $hops === false ? $old->hops : $hops),
+        new Settings($url ?? $old->url, $key, $hops === false ? $old->hops : $hops),
         $faults,
     ];
 }
 
 /**
- * @return array{url: string, site: string, key: string, hops: int}
+ * @return array{url: string, key: string, hops: int}
  */
 function settings_sanitize(mixed $form): array
 {
@@ -117,17 +113,17 @@ function settings_sanitize(mixed $form): array
 }
 
 /**
- * Why Trakk does not take the feed, null when it does. An empty batch: Trakk answers for the key and the site without
- * storing anything.
+ * Why Trakk does not take the feed, null when it does. An empty batch: Trakk answers for the key without storing
+ * anything.
  */
 function feed_fault(Settings $s): ?string
 {
-    [$status, , $error] = post($s, batch($s->site, [])[1]);
+    [$status, , $error] = post($s, batch([])[1]);
     if ($status >= 200 && $status < 300) {
         return null;
     }
     return [
-        400 => 'The feed key belongs to another site than ' . $s->site . '.',
+        400 => 'This Trakk is too old for the plugin. Update it.',
         401 => 'Trakk does not know this feed key.',
     ][$status] ?? ($status === 0 ? "No answer ($error)." : "$error.");
 }
@@ -163,7 +159,7 @@ function test_lines(Settings $s): array
     return [
         $line('Browser script', script_fault($s), 'Trakk serves the browser script.'),
         $s->feed() ? $line('Server feed', feed_fault($s), 'Trakk accepts the server feed.')
-            : ['ok' => true, 'text' => 'Server feed: off, it needs the site and the key.'],
+            : ['ok' => true, 'text' => 'Server feed: off, it needs the key.'],
     ];
 }
 
@@ -193,12 +189,6 @@ function settings_test(): void
 function settings_warnings(Settings $s): array
 {
     $out = [];
-    $home = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
-    if ($s->url !== '' && $s->site === '') {
-        $out[] = "No site is set: the script reports $home, the host of the page, and Trakk must list it.";
-    } elseif ($s->site !== '' && $s->site !== $home) {
-        $out[] = "The site is {$s->site}, but the pages are on $home. With and without www are two sites in Trakk.";
-    }
     if ($s->feed() && is_local(request_server())) {
         $out[] = 'This request came from the server itself, and such requests are not reported. If you are not on the'
             . ' server, its proxy sends no X-Forwarded-For.';
@@ -207,7 +197,7 @@ function settings_warnings(Settings $s): array
         $out[] = NO_QUEUE;
     }
     if ($s->key !== '' && !$s->feed()) {
-        $out[] = 'The server feed is off: it needs the URL, the site and the key.';
+        $out[] = 'The server feed is off: it needs the URL too.';
     }
     return $out;
 }
@@ -219,6 +209,7 @@ function settings_page(): void
     }
     $s = Settings::load();
     $addr = client_addr(request_server(), $s->hops);
+    $host = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
     ?>
     <div class="wrap">
         <h1>Trakk</h1>
@@ -234,15 +225,8 @@ function settings_page(): void
                         <input id="trakk-url" name="<?php echo esc_attr(OPTION); ?>[url]" type="url" class="regular-text"
                             value="<?php echo esc_attr($s->url); ?>" placeholder="https://trakk.example.com">
                         <p class="description">Turns on the browser script on this site's pages. Empty: they load
-                            nothing and nothing is reported.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="trakk-site">Site</label></th>
-                    <td>
-                        <input id="trakk-site" name="<?php echo esc_attr(OPTION); ?>[site]" type="text" class="regular-text"
-                            value="<?php echo esc_attr($s->site); ?>" placeholder="www.example.com">
-                        <p class="description">The domain as Trakk's <code>sites.json</code> lists it.</p>
+                            nothing and nothing is reported. Trakk's <code>sites.json</code> must list the pages' host
+                            as <code>domain</code>: <code><?php echo esc_html($host); ?></code></p>
                     </td>
                 </tr>
                 <tr>
@@ -255,7 +239,7 @@ function settings_page(): void
                             <p><label><input type="checkbox" name="<?php echo esc_attr(OPTION); ?>[key_clear]" value="1">
                                 Remove the key</label></p>
                         <?php endif; ?>
-                        <p class="description">With the URL and the site, also reports every request WordPress
+                        <p class="description">With the URL, also reports every request WordPress
                             answers to Trakk: address, path, status, duration, user agent, referrer, the id of a
                             signed-in user. The key is kept in this site's database.</p>
                     </td>

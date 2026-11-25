@@ -12,7 +12,6 @@ use const Trakk\BATCH_EVENTS;
 
 use function Trakk\build_event;
 use function Trakk\client_addr;
-use function Trakk\domain_of;
 use function Trakk\encode_event;
 use function Trakk\is_local;
 use function Trakk\is_loopback;
@@ -183,36 +182,36 @@ final class PureTest extends TestCase
 
     public function testBatch(): void
     {
-        self::assertSame([[], '{"v":1,"site":"example.com","events":[]}'], batch('example.com', []));
+        self::assertSame([[], '{"v":1,"events":[]}'], batch([]));
         self::assertSame(
-            [[1, 2], '{"v":1,"site":"example.com","events":[{"a":1},{"a":2}]}'],
-            batch('example.com', [self::row(1, '{"a":1}'), self::row(2, '{"a":2}')]),
+            [[1, 2], '{"v":1,"events":[{"a":1},{"a":2}]}'],
+            batch([self::row(1, '{"a":1}'), self::row(2, '{"a":2}')]),
         );
     }
 
     public function testARowThatIsNoJsonIsTakenAlongAndLeftOut(): void
     {
         self::assertSame(
-            [[1, 2], '{"v":1,"site":"example.com","events":[{"a":2}]}'],
-            batch('example.com', [self::row(1, '{"a":'), self::row(2, '{"a":2}')]),
+            [[1, 2], '{"v":1,"events":[{"a":2}]}'],
+            batch([self::row(1, '{"a":'), self::row(2, '{"a":2}')]),
         );
     }
 
     public function testBatchBounds(): void
     {
         $many = array_map(static fn(int $id): array => self::row($id, '{"a":1}'), range(1, 600));
-        self::assertCount(BATCH_EVENTS, batch('example.com', $many)[0]);
+        self::assertCount(BATCH_EVENTS, batch($many)[0]);
 
         $big = array_map(
             static fn(int $id): array => self::row($id, encode_event(['ua' => str_repeat('x', 30000)])),
             range(1, 20),
         );
-        [$ids, $body] = batch('example.com', $big);
+        [$ids, $body] = batch($big);
         self::assertCount(8, $ids);
         self::assertLessThan(256 * 1024, strlen($body));
 
         $huge = [self::row(1, encode_event(['ua' => str_repeat('x', 300000)])), self::row(2, '{}')];
-        self::assertSame([1], batch('example.com', $huge)[0], 'at least one row');
+        self::assertSame([1], batch($huge)[0], 'at least one row');
     }
 
     #[TestWith([204, true, true, 0])]
@@ -258,17 +257,6 @@ final class PureTest extends TestCase
         self::assertSame($want, origin_of($in));
     }
 
-    #[TestWith(['Example.com', 'example.com'])]
-    #[TestWith(['a-b.example.com', 'a-b.example.com'])]
-    #[TestWith(['localhost', null])]
-    #[TestWith(['example.com:80', null])]
-    #[TestWith(['https://example.com', null])]
-    #[TestWith(['-a.example', null])]
-    public function testDomainOf(string $in, ?string $want): void
-    {
-        self::assertSame($want, domain_of($in));
-    }
-
     #[TestWith([false])]
     #[TestWith([null])]
     #[TestWith(['x'])]
@@ -276,7 +264,7 @@ final class PureTest extends TestCase
     #[TestWith([['url' => 1, 'key' => [], 'hops' => []]])]
     public function testSettingsFromAnything(mixed $option): void
     {
-        self::assertSame(['url' => '', 'site' => '', 'key' => '', 'hops' => 0], Settings::from($option)->option());
+        self::assertSame(['url' => '', 'key' => '', 'hops' => 0], Settings::from($option)->option());
     }
 
     public function testTheReleasesOwnDescription(): void
@@ -306,12 +294,17 @@ final class PureTest extends TestCase
         self::assertSame(0, Settings::from(['hops' => -1])->hops);
     }
 
-    public function testTheFeedNeedsAllThree(): void
+    public function testTheFeedNeedsUrlAndKey(): void
     {
-        self::assertTrue(Settings::from(['url' => 'u', 'site' => 's', 'key' => 'k'])->feed());
-        self::assertFalse(Settings::from(['url' => 'u', 'site' => 's'])->feed());
-        self::assertFalse(Settings::from(['url' => 'u', 'key' => 'k'])->feed());
-        self::assertFalse(Settings::from(['site' => 's', 'key' => 'k'])->feed());
+        self::assertTrue(Settings::from(['url' => 'u', 'key' => 'k'])->feed());
+        self::assertFalse(Settings::from(['url' => 'u'])->feed());
+        self::assertFalse(Settings::from(['key' => 'k'])->feed());
+    }
+
+    public function testTheSiteOf020IsDropped(): void
+    {
+        $old = ['url' => 'u', 'site' => 's', 'key' => 'k', 'hops' => 1];
+        self::assertSame(['url' => 'u', 'key' => 'k', 'hops' => 1], Settings::from($old)->option());
     }
 
     /**

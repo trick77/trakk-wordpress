@@ -4,7 +4,7 @@ Tags: traffic, monitoring, bots, security, self-hosted
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: MIT
 License URI: https://opensource.org/license/mit
 
@@ -34,7 +34,7 @@ name and action, no values), search terms, script errors, web vitals, browser pr
 automated browsers, and a random visitor id kept in the browser's local storage. The server also sees the visitor's IP
 address.
 
-With the site and a feed key set too, your WordPress server sends it, for every request: time, IP address, method,
+With a feed key set too, your WordPress server sends it, for every request: time, IP address, method,
 path without the query, status, duration, user agent, referrer without its query, language, client hint and fetch
 metadata headers, the numeric id of a signed-in user, the AJAX action or XML-RPC method, and whether a sign-in failed.
 
@@ -50,7 +50,7 @@ plugin is active GitHub sees your server's address and the plugin's version, not
 
 1. Run a Trakk server and list your site in its `sites.json`.
 2. Activate the plugin and enter the server's address under Settings → Trakk.
-3. For the server feed, create a key with `trakk -new-feed-key` and enter it with the site's domain.
+3. For the server feed, create a key with `trakk -new-feed-key` and enter it too.
 
 == Frequently Asked Questions ==
 
@@ -64,6 +64,10 @@ can do that, otherwise by WP-Cron. If the Trakk server is down, requests are dro
 Cached pages do not reach WordPress: people on them come in through the script, bots on them do not.
 
 == Changelog ==
+
+= 0.3.0 =
+* No site setting any more: the feed key says which site it is. Update the Trakk server first, an older one refuses
+  the feed.
 
 = 0.2.0 =
 * Updates from the plugin's GitHub releases.

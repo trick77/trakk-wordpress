@@ -222,7 +222,7 @@ final class Queue
                 $this->swap($lease, 0);
                 return true;
             }
-            [$ids, $body] = batch($settings->site, $rows);
+            [$ids, $body] = batch($rows);
             [$status, $retry_after, $error] = post($settings, $body);
             $fails = $this->state()['fails'];
             $v = verdict($status, $retry_after, $fails);
