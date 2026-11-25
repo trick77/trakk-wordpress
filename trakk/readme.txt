@@ -42,8 +42,8 @@ What that server keeps, for how long, and the privacy policy that applies to it 
 Trakk: https://github.com/trick77/trakk
 
 When WordPress looks for updates, with or without a Trakk URL, the plugin asks its GitHub releases
-(https://github.com/trick77/trakk-wordpress) for a newer version, and an update is downloaded from there. GitHub sees
-your server's address and the plugin's version, nothing about your site or its visitors
+(https://github.com/trick77/trakk-wordpress) for a newer version, and an update is downloaded from there. While the
+plugin is active GitHub sees your server's address and the plugin's version, nothing about your site or its visitors
 (https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
 
 == Installation ==

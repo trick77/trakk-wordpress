@@ -283,7 +283,9 @@ final class PureTest extends TestCase
     {
         $release = release_from((string) shell_exec(dirname(__DIR__, 2) . '/release/update-json.sh'));
         self::assertNotNull($release);
-        self::assertSame('8.1', $release['requires_php']);
+        $header = (string) file_get_contents(dirname(__DIR__, 2) . '/trakk/trakk.php');
+        self::assertStringContainsString("Requires PHP:      {$release['requires_php']}\n", $header);
+        self::assertStringContainsString("Version:           {$release['version']}\n", $header);
     }
 
     #[TestWith(['{"version":"1.2.3","requires":"6.5","requires_php":"8.1","tested":"7.1"}', true])]

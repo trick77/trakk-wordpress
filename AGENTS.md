@@ -13,7 +13,7 @@ here (user: ship has nothing to do with PHP); CI is the gate.
 - 10 s timeout where INTEGRATION.md says 30: the sender holds a PHP worker.
 - No Composer packages. Updates come from GitHub releases (user wants auto-update): wordpress.org refuses that, a
   submission there drops `update.php` and `Update URI`. Plugin Check runs without its `plugin_updater` check.
-- An automatic update checks no `requires` (WordPress) of its own: `update_offer()` does, from `update.json`.
+- An automatic update checks no `requires` (WordPress) of its own: `latest_release()` does, from `update.json`.
 - `route` stays empty: Trakk's path rules name requests and page views alike.
 
 ## Traps

@@ -21,7 +21,7 @@ function update_offer(mixed $update, mixed $plugin, mixed $file): mixed
     if ($file !== SLUG . '/trakk.php' || !is_array($plugin) || ($plugin['UpdateURI'] ?? '') !== UPDATE_URI) {
         return $update;
     }
-    $release = latest_release();
+    $release = latest_release(true);
     if ($release === null) {
         return $update;
     }
@@ -34,10 +34,11 @@ function update_offer(mixed $update, mixed $plugin, mixed $file): mixed
  */
 function update_details(mixed $result, mixed $action, mixed $args): mixed
 {
-    if ($action !== 'plugin_information' || !is_object($args) || ($args->slug ?? '') !== SLUG) {
+    if ($action !== 'plugin_information' || !is_object($args) || ($args->slug ?? '') !== SLUG
+        || plugin_basename(dirname(__DIR__) . '/trakk.php') !== SLUG . '/trakk.php') {
         return $result;
     }
-    $release = latest_release();
+    $release = latest_release(false);
     if ($release === null) {
         return new \WP_Error('trakk_release', 'GitHub does not tell about the release right now.');
     }
@@ -75,36 +76,31 @@ function package_url(string $version): string
 }
 
 /**
- * The newest release's own description, a file beside its ZIP: GitHub's API allows 60 calls an hour and address.
- * Without an answer the last one: an offer already shown does not vanish. Asked once a request.
+ * The newest release as last told, the one source of the offer and its details. Its own description is a file beside
+ * its ZIP: GitHub's API allows 60 calls an hour and address. $ask: ask again, once a request. Without an answer what
+ * was told stands, an offer already shown does not vanish; a release that was pulled goes.
  *
  * @return array{version: string, requires: string, requires_php: string, tested: string}|null
  */
-function latest_release(): ?array
+function latest_release(bool $ask): ?array
 {
     static $asked = false;
-    static $release = null;
-    if ($asked) {
-        return $release;
-    }
-    $asked = true;
-    $res = wp_remote_get(UPDATE_URI . '/releases/latest/download/update.json', [
-        'timeout' => wp_doing_cron() ? TIMEOUT : 2, // per redirect, and somebody waits for the page
-        'limit_response_size' => 4096,
-    ]);
-    $json = is_wp_error($res) || wp_remote_retrieve_response_code($res) !== 200 ? '' : wp_remote_retrieve_body($res);
-    $release = release_from($json);
-    if ($release !== null) {
-        set_site_transient(RELEASE_TRANSIENT, $json, 30 * 24 * 3600);
-    } else {
-        $release = release_from((string) get_site_transient(RELEASE_TRANSIENT));
+    $told = static fn(): ?array => release_from((string) get_site_transient(RELEASE_TRANSIENT));
+    $release = $told();
+    if (($ask || $release === null) && !$asked) {
+        $asked = true;
+        ask_github();
+        $release = $told();
     }
     if ($release === null) {
         return null;
     }
     // An automatic update checks PHP by itself, and the plugin list tells. Not so for WordPress: as if up to date.
     if (!is_wp_version_compatible($release['requires'])) {
-        $release['version'] = VERSION;
+        $own = ['requires' => 'Requires at least', 'requires_php' => 'Requires PHP'];
+        $own = get_file_data(dirname(__DIR__) . '/trakk.php', $own);
+        $release = ['version' => VERSION, 'requires' => $own['requires'], 'requires_php' => $own['requires_php']]
+            + $release;
     }
     // "7.1" covers 7.1.1, which WordPress would take for untested.
     $running = get_bloginfo('version');
@@ -112,4 +108,22 @@ function latest_release(): ?array
         $release['tested'] = $running;
     }
     return $release;
+}
+
+function ask_github(): void
+{
+    $res = wp_remote_get(UPDATE_URI . '/releases/latest/download/update.json', [
+        'timeout' => wp_doing_cron() ? TIMEOUT : 2, // per redirect, and somebody waits for the page
+        'limit_response_size' => 4096,
+    ]);
+    if (is_wp_error($res)) {
+        return;
+    }
+    $json = wp_remote_retrieve_body($res);
+    $status = wp_remote_retrieve_response_code($res);
+    if ($status === 200 && release_from($json) !== null) {
+        set_site_transient(RELEASE_TRANSIENT, $json, 30 * 24 * 3600);
+    } elseif ($status === 404) {
+        delete_site_transient(RELEASE_TRANSIENT);
+    }
 }
