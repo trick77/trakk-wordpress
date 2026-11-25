@@ -19,7 +19,6 @@ namespace Trakk;
 defined('ABSPATH') || exit;
 
 const VERSION = '0.2.0';
-const PLUGIN_FILE = __FILE__;
 
 require __DIR__ . '/includes/pure.php';
 require __DIR__ . '/includes/queue.php';
@@ -38,6 +37,7 @@ require __DIR__ . '/includes/update.php';
 
 add_action(CRON_HOOK, __NAMESPACE__ . '\cron_send');
 add_filter('update_plugins_github.com', __NAMESPACE__ . '\update_offer', 10, 3);
+add_filter('http_request_args', __NAMESPACE__ . '\update_request', 10, 2);
 add_filter('plugins_api', __NAMESPACE__ . '\update_details', 10, 3);
 add_action('wp_enqueue_scripts', __NAMESPACE__ . '\enqueue_script');
 add_filter('script_loader_tag', __NAMESPACE__ . '\script_tag', 10, 2);

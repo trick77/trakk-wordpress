@@ -144,12 +144,19 @@ check('the site answers', str_contains($front, '</html>'), substr($front, 0, 200
 check('no tag before the URL is set', !str_contains($front, 'trakk.js'));
 
 // A newer release.
-[$offer, $details] = json_decode(control('update'), true) ?: [null, null];
+$update = static fn(string $q = ''): array => json_decode(control("update$q"), true) ?: [null, null, null, null];
+[$offer, $details, , $agent] = $update();
 $repo = 'https://github.com/trick77/trakk-wordpress';
 check('an update is offered', ($offer['new_version'] ?? '') === '99.0.0' && $offer['requires_php'] === '8.1'
     && $offer['package'] === "$repo/releases/download/99.0.0/trakk.zip", $offer);
-check('with its details', ($details['version'] ?? '') === '99.0.0'
+check('with its details', ($details['version'] ?? '') === '99.0.0' && $details['external'] === true
+    && $details['download_link'] === $offer['package']
     && str_contains($details['sections']['changelog'], "$repo/releases/tag/99.0.0"), $details);
+check('GitHub is not told the site', str_starts_with((string) $agent, 'trakk-wordpress/'), $agent);
+[$offer] = $update('&down=1');
+check('no answer keeps the offer', ($offer['new_version'] ?? '') === '99.0.0', $offer);
+[$offer, , $none] = $update('&requires=99.0');
+check('not for a WordPress too old', $offer === null && $none !== null, [$offer, $none]);
 
 // Sign in.
 fetch("$base/wp-login.php", ['jar' => $jar]);

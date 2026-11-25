@@ -25,8 +25,8 @@ server under Settings → Trakk.
 == External services ==
 
 This plugin works with Trakk, free and open source software you install on a server of your own. There is no account
-and no service of the plugin's author. The server is the one you enter under Settings → Trakk; without it nothing is
-contacted.
+and no service of the plugin's author. The server is the one you enter under Settings → Trakk; without it
+nothing about your visitors is sent anywhere.
 
 With the Trakk URL set, every page of your site loads `trakk.js` from that server, and the visitor's browser sends it
 page views (address, title, referrer), clicks on outbound links and downloads, form starts and submits (the form's id,
@@ -38,11 +38,13 @@ With the site and a feed key set too, your WordPress server sends it, for every 
 path without the query, status, duration, user agent, referrer without its query, language, client hint and fetch
 metadata headers, the numeric id of a signed-in user, the AJAX action or XML-RPC method, and whether a sign-in failed.
 
-The plugin also asks its GitHub releases (https://github.com/trick77/trakk-wordpress) for a newer version, when
-WordPress looks for updates. GitHub sees your server's address and the plugin's version, nothing about visitors.
-
 What that server keeps, for how long, and the privacy policy that applies to it are yours. Tell your visitors.
 Trakk: https://github.com/trick77/trakk
+
+When WordPress looks for updates, with or without a Trakk URL, the plugin asks its GitHub releases
+(https://github.com/trick77/trakk-wordpress) for a newer version, and an update is downloaded from there. GitHub sees
+your server's address and the plugin's version, nothing about your site or its visitors
+(https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
 
 == Installation ==
 
