@@ -305,6 +305,7 @@ final class PureTest extends TestCase
     {
         $old = ['url' => 'u', 'site' => 's', 'key' => 'k', 'hops' => 1];
         self::assertSame(['url' => 'u', 'key' => 'k', 'hops' => 1], Settings::from($old)->option());
+        self::assertFalse(Settings::from(['site' => ''] + $old)->feed(), 'a feed that was off stays off');
     }
 
     /**

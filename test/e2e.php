@@ -209,6 +209,7 @@ $r = $button(['key' => ''] + $ok);
 check('it tests script and feed', str_contains($r['body'], 'serves the browser script')
     && str_contains($r['body'], 'accepts the server feed') && !str_contains($r['body'], $key), $r);
 $r = records();
+check('it names the host once', count(array_filter($r, static fn($r) => ($r['body']['site'] ?? '') === $host)) === 1, $r);
 $r = array_values(array_filter($r, static fn($r) => $r['body'] === ['v' => 1, 'events' => []]));
 check('the test stores nothing', count($r) === 1 && $r[0]['auth'] === "Bearer $key"
     && $r[0]['type'] === 'application/json', $r);
@@ -218,7 +219,11 @@ $r = $button(['key' => ''] + $ok);
 check('a wrong key is named', str_contains($r['body'], 'Trakk does not know this feed key'), $r);
 stub('/control?status=400');
 $r = $button(['key' => ''] + $ok);
-check('a Trakk too old is named', str_contains($r['body'], 'too old for the plugin'), $r);
+check('a Trakk too old is named', str_contains($r['body'], 'too old for the plugin')
+    && str_contains($r['body'], 'the stub says so'), $r);
+stub('/control?other=1');
+$r = $button(['key' => ''] + $ok);
+check('another site\'s key is named', str_contains($r['body'], "belongs to another site than $host"), $r);
 stub('/reset');
 $r = $button(['url' => 'http://stub:8080', 'key' => ''] + $ok);
 check('the key goes to no other server', str_contains($r['body'], 'Enter the feed key again')
