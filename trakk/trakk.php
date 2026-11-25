@@ -4,7 +4,7 @@
  * Plugin Name:       Trakk
  * Plugin URI:        https://github.com/trick77/trakk-wordpress
  * Description:       Reports this site's traffic to your own Trakk server: the browser script on every page and, with a feed key, every request WordPress answers.
- * Version:           0.2.0
+ * Version:           0.3.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            trick77
@@ -18,7 +18,7 @@ namespace Trakk;
 
 defined('ABSPATH') || exit;
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 require __DIR__ . '/includes/pure.php';
 require __DIR__ . '/includes/queue.php';

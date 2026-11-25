@@ -170,29 +170,24 @@ check(
     str_contains($page, 'Trakk URL') && str_contains($page, 'Trusted proxies'),
     substr(strip_tags($page), 0, 300)
 );
+check('it names the host Trakk must list', str_contains($page, "<code>$host</code>"), strip_tags($page));
 check('a visitor does not see it', !str_contains(
     fetch("$base/wp-admin/options-general.php?page=trakk")['body'],
     'Trakk URL'
 ));
 
 // Settings.
-$ok = ['url' => STUB . '/', 'site' => strtoupper($host), 'key' => $key, 'hops' => '0'];
+$ok = ['url' => STUB . '/', 'key' => $key, 'hops' => '0'];
 $html = save(['url' => 'https://trakk.example.com/path'] + $ok);
 check('a URL with a path is refused', str_contains($html, 'is an origin, such as'), strip_tags($html));
-$html = save(['site' => 'no host'] + $ok);
-check('a site that is no host is refused', str_contains($html, 'The site is a hostname'), strip_tags($html));
 $html = save(['hops' => '99'] + $ok);
 check('too many hops are refused', str_contains($html, 'a number from 0 to 10'), strip_tags($html));
 $html = save($ok);
-check('the URL and the site are tidied', str_contains($html, 'value="' . STUB . '"')
-    && str_contains($html, "value=\"$host\""), strip_tags($html));
+check('the URL is tidied', str_contains($html, 'value="' . STUB . '"'), strip_tags($html));
 $html = save(['key' => ''] + $ok);
 check('the key is never sent back', !str_contains($html, $key));
 check('an empty key keeps it', str_contains($html, 'Set. Leave empty to keep it'));
 check('the status shows', str_contains($html, 'Last delivered'));
-$html = save(['site' => 'other.example.com', 'key' => ''] + $ok);
-check('a site that is not the pages\' is warned of', str_contains($html, 'but the pages are on'), strip_tags($html));
-save(['key' => ''] + $ok);
 
 // The test button: what the form holds, nothing saved. Its own requests are the driver's, the queue is emptied first.
 stub('/reset');
@@ -214,7 +209,7 @@ $r = $button(['key' => ''] + $ok);
 check('it tests script and feed', str_contains($r['body'], 'serves the browser script')
     && str_contains($r['body'], 'accepts the server feed') && !str_contains($r['body'], $key), $r);
 $r = records();
-$r = array_values(array_filter($r, static fn($r) => $r['body'] === ['v' => 1, 'site' => $host, 'events' => []]));
+$r = array_values(array_filter($r, static fn($r) => $r['body'] === ['v' => 1, 'events' => []]));
 check('the test stores nothing', count($r) === 1 && $r[0]['auth'] === "Bearer $key"
     && $r[0]['type'] === 'application/json', $r);
 check('no site in the user agent', $r && str_starts_with($r[0]['ua'], 'trakk-wordpress/'), $r);
@@ -223,7 +218,7 @@ $r = $button(['key' => ''] + $ok);
 check('a wrong key is named', str_contains($r['body'], 'Trakk does not know this feed key'), $r);
 stub('/control?status=400');
 $r = $button(['key' => ''] + $ok);
-check('another site is named', str_contains($r['body'], 'belongs to another site'), $r);
+check('a Trakk too old is named', str_contains($r['body'], 'too old for the plugin'), $r);
 stub('/reset');
 $r = $button(['url' => 'http://stub:8080', 'key' => ''] + $ok);
 check('the key goes to no other server', str_contains($r['body'], 'Enter the feed key again')
@@ -241,7 +236,7 @@ check('no script there', str_contains($r['body'], 'Browser script:'), $r);
 $r = $button(['url' => 'not a url', 'key' => ''] + $ok);
 check('it names a fault', str_contains($r['body'], 'is an origin'), $r);
 $r = $button(['key' => '', 'key_clear' => '1'] + $ok);
-check('without a key only the script', str_contains($r['body'], 'it needs the site and the key'), $r);
+check('without a key only the script', str_contains($r['body'], 'it needs the key'), $r);
 $page = fetch("$base/wp-admin/options-general.php?page=trakk", ['jar' => $jar])['body'];
 check('and saves nothing', str_contains($page, 'value="' . STUB . '"') && str_contains($page, 'Set. Leave empty'));
 $r = $button($ok, ['jar' => "$jar.none"]);
