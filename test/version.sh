@@ -1,12 +1,26 @@
 #!/bin/sh
-# Prints the plugin's version; fails when its three places disagree.
+# Prints the plugin's version; fails when trakk.php and readme.txt disagree on it or on what the plugin needs.
 set -eu
 cd "$(dirname "$0")/../trakk"
-header=$(sed -n 's/^ \* Version: *//p' trakk.php)
-constant=$(sed -n "s/^const VERSION = '\(.*\)';$/\1/p" trakk.php)
-stable=$(sed -n 's/^Stable tag: *//p' readme.txt)
-if ! printf %s "$header" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' || [ "$header" != "$constant" ] || [ "$header" != "$stable" ]; then
-  echo "versions: header '$header', constant '$constant', stable tag '$stable'" >&2
+header() {
+  sed -n "s/^ \* $1: *//p" trakk.php
+}
+readme() {
+  sed -n "s/^$1: *//p" readme.txt
+}
+same() {
+  if [ -z "$2" ] || [ "$2" != "$3" ]; then
+    echo "$1: '$2' and '$3'" >&2
+    exit 1
+  fi
+}
+version=$(header Version)
+if ! printf %s "$version" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+'; then
+  echo "Version: '$version'" >&2
   exit 1
 fi
-echo "$header"
+same "Version and constant" "$version" "$(sed -n "s/^const VERSION = '\(.*\)';$/\1/p" trakk.php)"
+same "Version and Stable tag" "$version" "$(readme 'Stable tag')"
+same "Requires at least" "$(header 'Requires at least')" "$(readme 'Requires at least')"
+same "Requires PHP" "$(header 'Requires PHP')" "$(readme 'Requires PHP')"
+echo "$version"
