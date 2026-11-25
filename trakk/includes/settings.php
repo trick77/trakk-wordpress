@@ -114,18 +114,26 @@ function settings_sanitize(mixed $form): array
 
 /**
  * Why Trakk does not take the feed, null when it does. An empty batch: Trakk answers for the key without storing
- * anything.
+ * anything. A second one names the pages' host, which Trakk compares with the key's: one swapped with another site's
+ * would file everything there.
  */
 function feed_fault(Settings $s): ?string
 {
     [$status, , $error] = post($s, batch([])[1]);
     if ($status >= 200 && $status < 300) {
-        return null;
+        $host = home_host();
+        [$status] = post($s, (string) json_encode(['v' => 1, 'site' => $host, 'events' => []]));
+        return $status === 400 ? "The feed key belongs to another site than $host." : null;
     }
     return [
-        400 => 'This Trakk is too old for the plugin. Update it.',
+        400 => "Trakk refuses the batch, it may be too old for the plugin ($error).",
         401 => 'Trakk does not know this feed key.',
     ][$status] ?? ($status === 0 ? "No answer ($error)." : "$error.");
+}
+
+function home_host(): string
+{
+    return strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
 }
 
 /**
@@ -209,7 +217,6 @@ function settings_page(): void
     }
     $s = Settings::load();
     $addr = client_addr(request_server(), $s->hops);
-    $host = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
     ?>
     <div class="wrap">
         <h1>Trakk</h1>
@@ -226,7 +233,7 @@ function settings_page(): void
                             value="<?php echo esc_attr($s->url); ?>" placeholder="https://trakk.example.com">
                         <p class="description">Turns on the browser script on this site's pages. Empty: they load
                             nothing and nothing is reported. Trakk's <code>sites.json</code> must list the pages' host
-                            as <code>domain</code>: <code><?php echo esc_html($host); ?></code></p>
+                            as <code>domain</code>: <code><?php echo esc_html(home_host()); ?></code></p>
                     </td>
                 </tr>
                 <tr>

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * In Trakk's place: keeps every batch, answers as told. /control?status=…&sleep=…&retry=…, /reset, /records.
+ * In Trakk's place: keeps every batch, answers as told. /control?status=…&sleep=…&retry=…&other=…, /reset, /records.
  */
 
 const MODE = '/tmp/mode.json';
@@ -30,6 +30,9 @@ switch ($path) {
         $mode = is_file(MODE) ? json_decode(file_get_contents(MODE), true) : [];
         $status = (int) ($mode['status'] ?? 204);
         $body = file_get_contents('php://input');
+        if (!empty($mode['other']) && isset(json_decode($body, true)['site'])) {
+            $status = 400; // the key is another site's
+        }
         $record = [
             'status' => $status,
             'auth' => $_SERVER['HTTP_AUTHORIZATION'] ?? '',

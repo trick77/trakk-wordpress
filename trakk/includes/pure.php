@@ -300,7 +300,8 @@ final class Settings
         $hops = $o['hops'] ?? 0;
         return new self(
             $text('url'),
-            $text('key'),
+            // 0.2.0 kept a key without a site, its feed off and without a table: it stays off.
+            ($o['site'] ?? null) === '' ? '' : $text('key'),
             max(0, min(self::HOPS_MAX, is_numeric($hops) ? (int) $hops : 0)),
         );
     }
