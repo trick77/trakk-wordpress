@@ -1,0 +1,16 @@
+# WordPress's own source tells PHPStan its functions: wordpress/ is unpacked by test/wordpress.sh.
+parameters:
+    level: 8
+    phpVersion:
+        min: 80100
+        max: 80600
+    tmpDir: .cache/phpstan
+    paths:
+        - trakk
+        - test/unit
+    excludePaths:
+        - test/unit/bootstrap.php
+    scanDirectories:
+        - wordpress/wp-includes
+        - wordpress/wp-admin/includes
+    treatPhpDocTypesAsCertain: false

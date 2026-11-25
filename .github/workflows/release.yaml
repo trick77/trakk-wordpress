@@ -1,0 +1,38 @@
+name: Release
+
+# By hand only: tags master with the plugin's own version and publishes its ZIP.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yaml
+
+  release:
+    needs: ci
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(test/version.sh)
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "::error::$version is already released: set a new version in trakk/trakk.php and trakk/readme.txt"
+            exit 1
+          fi
+          # The folder in the ZIP is the plugin's slug, for good: WordPress stores it.
+          git archive --format=zip -o trakk.zip HEAD trakk
+          gh release create "$version" trakk.zip --target "$GITHUB_SHA" --title "$version" --generate-notes
