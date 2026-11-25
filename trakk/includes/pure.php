@@ -337,3 +337,22 @@ final class Settings
         return ['url' => $this->url, 'site' => $this->site, 'key' => $this->key, 'hops' => $this->hops];
     }
 }
+
+/**
+ * A release's update.json, null unless every entry is a plain version: they end up in addresses and on pages.
+ *
+ * @return array{version: string, requires: string, requires_php: string, tested: string}|null
+ */
+function release_from(string $json): ?array
+{
+    $in = json_decode($json, true);
+    $out = [];
+    foreach (['version', 'requires', 'requires_php', 'tested'] as $k) {
+        $v = is_array($in) ? $in[$k] ?? null : null;
+        if (!is_string($v) || !preg_match('/^\d+(\.\d+){1,2}$/D', $v)) {
+            return null;
+        }
+        $out[$k] = $v;
+    }
+    return $out;
+}

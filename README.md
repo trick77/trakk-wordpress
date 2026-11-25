@@ -7,7 +7,7 @@ things to a site, both to your own Trakk server:
 - **The server feed**: every request WordPress answers, so bots, sign-in attempts, XML-RPC and probes for missing pages
   show up too.
 
-Without settings it loads nothing and sends nothing.
+Without settings it loads nothing on the pages and sends nothing about visitors.
 
 ## Setup
 
@@ -34,6 +34,11 @@ Without settings it loads nothing and sends nothing.
    Plugin → Upload. WordPress 6.5 and PHP 8.1 or newer.
 3. Settings → Trakk (on a network: for super admins, the URL becomes a script on every page): the URL alone turns on the script; site and feed key add the feed. **Test connection** asks Trakk
    about what the form holds, before anything is saved.
+
+### Updates
+
+From 0.2.0 on WordPress offers new releases like any plugin's, with one click or automatically (Plugins → Enable
+auto-updates): the plugin asks this repository's releases. An older version is updated by uploading the ZIP once.
 
 ### Behind a proxy
 

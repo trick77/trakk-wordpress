@@ -23,6 +23,7 @@ use const Trakk\LIMITS;
 use function Trakk\origin_of;
 use function Trakk\parse_addr;
 use function Trakk\path_of;
+use function Trakk\release_from;
 
 use Trakk\Settings;
 
@@ -276,6 +277,25 @@ final class PureTest extends TestCase
     public function testSettingsFromAnything(mixed $option): void
     {
         self::assertSame(['url' => '', 'site' => '', 'key' => '', 'hops' => 0], Settings::from($option)->option());
+    }
+
+    public function testTheReleasesOwnDescription(): void
+    {
+        $release = release_from((string) shell_exec(dirname(__DIR__, 2) . '/release/update-json.sh'));
+        self::assertNotNull($release);
+        self::assertSame('8.1', $release['requires_php']);
+    }
+
+    #[TestWith(['{"version":"1.2.3","requires":"6.5","requires_php":"8.1","tested":"7.1"}', true])]
+    #[TestWith(['{"version":"1.2.3"}', false])]
+    #[TestWith(['{"version":"../x","requires":"6.5","requires_php":"8.1","tested":"7.1"}', false])]
+    #[TestWith(['{"version":"1.2.3\\n","requires":"6.5","requires_php":"8.1","tested":"7.1"}', false])]
+    #[TestWith(['{"version":1.2,"requires":"6.5","requires_php":"8.1","tested":"7.1"}', false])]
+    #[TestWith(['<html>', false])]
+    #[TestWith(['', false])]
+    public function testReleaseFrom(string $json, bool $taken): void
+    {
+        self::assertSame($taken, release_from($json) !== null);
     }
 
     public function testHopsAreBounded(): void

@@ -143,6 +143,14 @@ $front = fetch("$base/")['body'];
 check('the site answers', str_contains($front, '</html>'), substr($front, 0, 200));
 check('no tag before the URL is set', !str_contains($front, 'trakk.js'));
 
+// A newer release.
+[$offer, $details] = json_decode(control('update'), true) ?: [null, null];
+$repo = 'https://github.com/trick77/trakk-wordpress';
+check('an update is offered', ($offer['new_version'] ?? '') === '99.0.0' && $offer['requires_php'] === '8.1'
+    && $offer['package'] === "$repo/releases/download/99.0.0/trakk.zip", $offer);
+check('with its details', ($details['version'] ?? '') === '99.0.0'
+    && str_contains($details['sections']['changelog'], "$repo/releases/tag/99.0.0"), $details);
+
 // Sign in.
 fetch("$base/wp-login.php", ['jar' => $jar]);
 fetch("$base/wp-login.php", ['jar' => $jar, 'post' => ['log' => 'admin', 'pwd' => 'e2e-password', 'testcookie' => '1']]);

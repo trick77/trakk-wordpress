@@ -35,4 +35,5 @@ jobs:
           fi
           # The folder in the ZIP is the plugin's slug, for good: WordPress stores it.
           git archive --format=zip -o trakk.zip HEAD trakk
-          gh release create "$version" trakk.zip --target "$GITHUB_SHA" --title "$version" --generate-notes
+          release/update-json.sh > update.json
+          gh release create "$version" trakk.zip update.json --target "$GITHUB_SHA" --title "$version" --generate-notes
