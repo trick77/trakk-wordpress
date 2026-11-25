@@ -155,8 +155,9 @@ check('with its details', ($details['version'] ?? '') === '99.0.0' && $details['
 check('GitHub is not told the site', str_starts_with((string) $agent, 'trakk-wordpress/'), $agent);
 [$offer] = $update('&down=1');
 check('no answer keeps the offer', ($offer['new_version'] ?? '') === '99.0.0', $offer);
-[$offer, , $none] = $update('&requires=99.0');
-check('not for a WordPress too old', $offer === null && $none !== null, [$offer, $none]);
+[$offer, $details, $none] = $update('&requires=99.0');
+check('not for a WordPress too old, the details neither', $offer === null && $none !== null
+    && $details['version'] === $none['new_version'], [$offer, $details, $none]);
 
 // Sign in.
 fetch("$base/wp-login.php", ['jar' => $jar]);

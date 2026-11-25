@@ -60,7 +60,7 @@ for kind in apache fpm; do
   wp plugin uninstall trakk --skip-delete
   # shellcheck disable=SC2016 # PHP's
   left=$(wp eval 'global $wpdb; echo count($wpdb->get_col("SHOW TABLES LIKE \"%traffic_observability%\"")),
-    ":", count($wpdb->get_col("SELECT 1 FROM $wpdb->options WHERE option_name LIKE \"traffic_observability%\"")),
+    ":", count($wpdb->get_col("SELECT 1 FROM $wpdb->options WHERE option_name LIKE \"%traffic_observability%\"")),
     ":", (int) wp_next_scheduled("traffic_observability_send");')
   if [ "$left" != "0:0:0" ]; then
     echo "$kind: left behind after uninstall (tables:options:cron): $left"
