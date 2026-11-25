@@ -22,10 +22,7 @@ final class Recorder
     {
         $this->settings = $settings;
         $this->queue = new Queue();
-        // Now: WordPress adds slashes to $_SERVER once the plugins are loaded (Sec-CH-UA is full of quotes), and
-        // plugins rewrite REQUEST_URI and REMOTE_ADDR.
-        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- reported as sent, never put out
-        $this->server = array_intersect_key($_SERVER, array_flip(SERVER_KEYS));
+        $this->server = request_server();
     }
 
     public static function start(Settings $settings): void
@@ -34,14 +31,14 @@ final class Recorder
             return;
         }
         $r = new self($settings);
-        if (is_loopback(client_addr($r->server, $settings->hops))) {
+        if (is_local($r->server, $settings->hops)) {
             return; // a local health check, a system cron on wp-cron.php
         }
         add_filter('determine_current_user', [$r, 'resolved'], PHP_INT_MAX);
         add_action('wp_login_failed', [$r, 'login_failed']);
         add_action('xmlrpc_call', [$r, 'xmlrpc_call']);
         if (!finishes()) {
-            add_action('shutdown', [$r, 'schedule'], PHP_INT_MAX);
+            add_action('shutdown', [$r->queue, 'schedule'], PHP_INT_MAX);
         }
         // Registered again from within: last, so what other plugins do after the answer never waits for Trakk.
         register_shutdown_function(static function () use ($r): void {
@@ -78,16 +75,6 @@ final class Recorder
         }
     }
 
-    /**
-     * Where no request can outlive its answer, WP-Cron sends: one event, only while something waits.
-     */
-    public function schedule(): void
-    {
-        if (!wp_next_scheduled(CRON_HOOK)) {
-            wp_schedule_single_event(time() + 60, CRON_HOOK);
-        }
-    }
-
     public function shutdown(): void
     {
         global $wpdb;
@@ -108,6 +95,9 @@ final class Recorder
             $this->queue->add($event);
             if ($later) {
                 $this->queue->send($this->settings);
+                if ($this->queue->paused_until() > time()) {
+                    $this->queue->schedule(); // on a quiet site no request may come to try again
+                }
             }
         } catch (\Throwable) {
             return; // the request is answered or on its way: nothing here may show
@@ -163,6 +153,19 @@ final class Recorder
 }
 
 /**
+ * The request as it came in. Called first at load: WordPress adds slashes to $_SERVER once the plugins are loaded
+ * (Sec-CH-UA is full of quotes), and plugins rewrite REQUEST_URI and REMOTE_ADDR.
+ *
+ * @return array<string, mixed>
+ */
+function request_server(): array
+{
+    static $server = null;
+    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- reported as sent, never put out
+    return $server ??= array_intersect_key($_SERVER, array_flip(SERVER_KEYS));
+}
+
+/**
  * Whether a request can go on after its answer is out.
  */
 function finishes(): bool
@@ -181,7 +184,7 @@ function cron_send(): void
     }
     $queue = new Queue();
     $queue->send($settings);
-    if (!finishes() && $queue->length() > 0 && !wp_next_scheduled(CRON_HOOK)) {
-        wp_schedule_single_event(time() + 60, CRON_HOOK);
+    if ($queue->length() > 0) {
+        $queue->schedule();
     }
 }

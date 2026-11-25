@@ -26,6 +26,7 @@ require __DIR__ . '/includes/script.php';
 
 // A function of its own: plugin files run in WordPress's global scope.
 (static function (): void {
+    request_server();
     $settings = Settings::load();
     if ($settings->feed()) {
         Recorder::start($settings);
@@ -44,12 +45,13 @@ if (is_admin()) {
     add_filter('plugin_action_links_' . plugin_basename(__FILE__), __NAMESPACE__ . '\settings_link');
 }
 
-register_activation_hook(__FILE__, static function (): void {
-    if (Settings::load()->feed()) {
-        (new Queue())->install();
-    }
+register_activation_hook(__FILE__, static function (mixed $network): void {
+    each_site((bool) $network, static function (): void {
+        if (Settings::load()->feed()) {
+            (new Queue())->install();
+        }
+    });
 });
-register_deactivation_hook(__FILE__, static function (): void {
-    wp_clear_scheduled_hook(CRON_HOOK);
-    (new Queue())->close();
+register_deactivation_hook(__FILE__, static function (mixed $network): void {
+    each_site((bool) $network, static fn() => (new Queue())->close());
 });

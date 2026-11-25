@@ -14,6 +14,7 @@ use function Trakk\build_event;
 use function Trakk\client_addr;
 use function Trakk\domain_of;
 use function Trakk\encode_event;
+use function Trakk\is_local;
 use function Trakk\is_loopback;
 use function Trakk\is_private;
 
@@ -77,6 +78,18 @@ final class PureTest extends TestCase
     public function testIsLoopback(string $addr, bool $want): void
     {
         self::assertSame($want, is_loopback($addr));
+    }
+
+    #[TestWith(['127.0.0.1', null, 0, true])]
+    #[TestWith(['127.0.0.1', null, 1, true])]
+    #[TestWith(['127.0.0.1', '127.0.0.1', 1, true])]
+    #[TestWith(['127.0.0.1', '203.0.113.7', 1, false])] // a proxy on the same host
+    #[TestWith(['203.0.113.7', '127.0.0.1', 1, false])] // around the proxy
+    #[TestWith(['203.0.113.7', '::1', 1, false])]
+    public function testIsLocal(string $peer, ?string $xff, int $hops, bool $want): void
+    {
+        $server = ['REMOTE_ADDR' => $peer] + ($xff === null ? [] : ['HTTP_X_FORWARDED_FOR' => $xff]);
+        self::assertSame($want, is_local($server, $hops));
     }
 
     #[TestWith(['10.0.0.1', true])]

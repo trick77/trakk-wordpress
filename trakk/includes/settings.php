@@ -9,6 +9,8 @@ defined('ABSPATH') || exit;
 
 const PAGE = 'trakk';
 const TEST_ACTION = 'traffic_observability_test';
+const NO_QUEUE = 'The server feed has no table to wait in: the database refused it or something removed it. Save again;'
+    . ' the database user needs the CREATE privilege.';
 
 function settings_menu(): void
 {
@@ -66,6 +68,11 @@ function settings_read(mixed $form, Settings $old): array
     $key = $text('key');
     if ($key === '') {
         $key = $text('key_clear') === '' ? $old->key : '';
+        if ($key !== '' && ($url ?? '') !== '' && $url !== $old->url) {
+            // A key is one server's secret: not sent to another on the strength of a typed address.
+            $url = $old->url;
+            $faults['key'] = 'Enter the feed key again: the URL is another server\'s.';
+        }
     } elseif (!preg_match('/^[\x21-\x7e]{16,256}$/', $key)) {
         $key = $old->key;
         $faults['key'] = 'The feed key is 16 to 256 characters without spaces.';
@@ -93,10 +100,10 @@ function settings_sanitize(mixed $form): array
     foreach ($faults as $field => $message) {
         add_settings_error(OPTION, $field, $message);
     }
-    if ($new->feed()) {
-        (new Queue())->install();
-    } else {
+    if (!$new->feed()) {
         (new Queue())->close();
+    } elseif (!(new Queue())->install()) {
+        add_settings_error(OPTION, 'queue', NO_QUEUE);
     }
     return $new->option();
 }
@@ -184,6 +191,9 @@ function settings_warnings(Settings $s): array
     } elseif ($s->site !== '' && $s->site !== $home) {
         $out[] = "The site is {$s->site}, but the pages are on $home. With and without www are two sites in Trakk.";
     }
+    if ($s->feed() && !(new Queue())->installed()) {
+        $out[] = NO_QUEUE;
+    }
     if ($s->key !== '' && !$s->feed()) {
         $out[] = 'The server feed is off: it needs the URL, the site and the key.';
     }
@@ -196,7 +206,7 @@ function settings_page(): void
         return;
     }
     $s = Settings::load();
-    $addr = client_addr(array_map('sanitize_text_field', wp_unslash($_SERVER)), $s->hops);
+    $addr = client_addr(request_server(), $s->hops);
     ?>
     <div class="wrap">
         <h1>Trakk</h1>

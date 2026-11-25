@@ -207,9 +207,15 @@ stub('/control?status=400');
 $r = $button(['key' => ''] + $ok);
 check('another site is named', str_contains($r['body'], 'belongs to another site'), $r);
 stub('/reset');
-$r = $button(['url' => 'http://nothing.wp.test', 'key' => ''] + $ok);
+$r = $button(['url' => 'http://stub:8080', 'key' => ''] + $ok);
+check('the key goes to no other server', str_contains($r['body'], 'Enter the feed key again')
+    && !array_filter(records(), static fn($r) => $r['body']['events'] === []), [$r, records()]);
+$html = save(['url' => 'http://stub:8080', 'key' => ''] + $ok);
+check('nor is that saved', str_contains($html, 'Enter the feed key again')
+    && str_contains($html, 'value="' . STUB . '"'), strip_tags($html));
+$r = $button(['url' => 'http://nothing.wp.test'] + $ok);
 check('it tests what was typed', str_contains($r['body'], 'No answer'), $r);
-$r = $button(['url' => 'http://nginx', 'key' => ''] + $ok);
+$r = $button(['url' => 'http://nginx'] + $ok);
 check('no script there', str_contains($r['body'], 'Browser script:'), $r);
 $r = $button(['url' => 'not a url', 'key' => ''] + $ok);
 check('it names a fault', str_contains($r['body'], 'is an origin'), $r);
@@ -338,6 +344,7 @@ stub('/control?status=503');
 $one('/kept');
 flush_queue();
 check('503 keeps the batch', (int) control('length') > 0);
+check('WP-Cron tries again if nobody comes', (int) control('scheduled') > 0, control('scheduled'));
 $n = count(records());
 $one('/kept-too');
 flush_queue();
@@ -372,6 +379,29 @@ check('401 drops the batch', !in_array('/limited', $paths, true) && in_array('/l
 $html = fetch("$base/wp-admin/options-general.php?page=trakk", ['jar' => $jar])['body'];
 check('the failure shows', str_contains($html, 'HTTP 401: the stub says so'), strip_tags($html));
 
+// New settings: what waits goes with them, never once more with the old ones.
+stub('/reset');
+stub('/control?status=503');
+control('empty');
+control('next');
+$one('/moved');
+flush_queue();
+stub('/reset');
+save(['key' => 'a-new-feed-key-0123456789'] + $ok);
+flush_queue();
+sleep(1);
+$auth = array_unique(array_column(records(), 'auth'));
+check('saved settings send at once, the old key not again', $auth === ['Bearer a-new-feed-key-0123456789']
+    && in_array('/moved', array_column(events(), 'path'), true), [$auth, events()]);
+save($ok);
+
+// Something removed the table.
+control('drop');
+$html = fetch("$base/wp-admin/options-general.php?page=trakk", ['jar' => $jar])['body'];
+check('a missing table is told', str_contains($html, 'no table to wait in'), strip_tags($html));
+$html = save(['key' => ''] + $ok);
+check('saving brings it back', !str_contains($html, 'no table to wait in') && control('length') !== '', strip_tags($html));
+
 // Too old to send.
 stub('/reset');
 stub('/control?status=503');
@@ -404,6 +434,11 @@ if ($fpm) {
     $s = fetch("$base/?e2e=session", ['ua' => BROWSER, 'jar' => "$jar.s"]);
     $s = fetch("$base/?e2e=session", ['ua' => BROWSER, 'jar' => "$jar.s"]);
     check('a session is not held', $s['time'] < 3, $s['time']);
+}
+if ($fpm) {
+    $lease = control('lease');
+    save(['key' => ''] + $ok);
+    check('saving leaves a sender its lease', (int) $lease > 0 && control('lease') === $lease, $lease);
 }
 sleep($fpm ? 12 : 0);
 if (!$fpm) {
@@ -468,7 +503,7 @@ if (!$fpm) {
 }
 
 // Trakk itself.
-save(['url' => TRAKK, 'key' => ''] + $ok);
+save(['url' => TRAKK] + $ok);
 $r = $button(['url' => TRAKK, 'key' => ''] + $ok);
 check('Trakk serves the script and accepts the feed', str_contains($r['body'], 'serves the browser script')
     && str_contains($r['body'], 'accepts the server feed'), $r);
@@ -486,6 +521,18 @@ check('Trakk stored the page', str_contains($log, '/to-trakk'), substr($log, 0, 
 check('Trakk stored the failed login', str_contains($log, 'login_failed'), substr($log, 0, 500));
 $r = $button(['url' => TRAKK, 'key' => 'another-key-0123456789'] + $ok);
 check('Trakk refuses another key', str_contains($r['body'], 'Trakk does not know this feed key'), $r);
+
+// Deactivated in the browser, under which the request's own shutdown still runs.
+$link = static function (string $action) use ($base, $jar): string {
+    $html = fetch("$base/wp-admin/plugins.php", ['jar' => $jar])['body'];
+    preg_match('#href="(plugins\.php\?action=' . $action . '&amp;plugin=trakk[^"]*)"#', $html, $m);
+    return html_entity_decode($m[1] ?? 'plugins.php');
+};
+fetch("$base/wp-admin/" . $link('deactivate'), ['jar' => $jar]);
+check('deactivated: no table', control('length') === '', control('length'));
+check('deactivated: no cron event', (int) control('scheduled') < 0, control('scheduled'));
+fetch("$base/wp-admin/" . $link('activate'), ['jar' => $jar]);
+check('activated: the table is back', control('length') !== '', control('length'));
 
 // Off again.
 $html = save(['url' => '', 'key' => '', 'key_clear' => '1'] + $ok);

@@ -40,6 +40,16 @@ add_action('init', static function (): void {
             global $wpdb;
             echo $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}traffic_observability_queue");
             exit;
+        case 'drop':
+            global $wpdb;
+            $wpdb->query("DROP TABLE {$wpdb->prefix}traffic_observability_queue");
+            echo 'dropped';
+            exit;
+        case 'lease':
+            global $wpdb;
+            $name = 'traffic_observability_lease';
+            echo $wpdb->get_var("SELECT option_value FROM {$wpdb->options} WHERE option_name = '$name'");
+            exit;
         case 'fill':
             global $wpdb;
             $values = implode(',', array_fill(0, 5000, '(' . time() . ", '{}')"));
@@ -58,7 +68,8 @@ add_action('init', static function (): void {
             exit;
         case 'next':
             global $wpdb;
-            $wpdb->query("UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name = 'traffic_observability_next'");
+            $wpdb->query("UPDATE {$wpdb->options} SET option_value = '0' WHERE option_name IN
+                ('traffic_observability_lease', 'traffic_observability_pause')");
             echo 'released';
             exit;
     }

@@ -107,6 +107,17 @@ function is_loopback(string $addr): bool
 }
 
 /**
+ * The server's own request: from loopback, and not on behalf of somebody else. The header alone is the client's word
+ * where the proxy can be gone around.
+ *
+ * @param array<string, mixed> $server
+ */
+function is_local(array $server, int $hops): bool
+{
+    return is_loopback(client_addr($server, 0)) && is_loopback(client_addr($server, $hops));
+}
+
+/**
  * A private, loopback or otherwise reserved address: as a visitor's, one a proxy stands in front of.
  */
 function is_private(string $addr): bool
