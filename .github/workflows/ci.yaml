@@ -31,7 +31,7 @@ jobs:
       - run: test/wordpress.sh
       - run: composer stan -- --no-progress
       - run: node --check trakk/settings.js
-      - run: shellcheck test/*.sh
+      - run: shellcheck test/*.sh release/*.sh
       - run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
       - run: test/version.sh
 

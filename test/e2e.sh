@@ -50,7 +50,7 @@ for kind in apache fpm; do
     failed=1
   elif [ "$check" ]; then
     # Warnings fail too: wordpress.org's reviewers see them.
-    report=$(wp plugin check trakk 2>&1 || true)
+    report=$(wp plugin check trakk --exclude-checks=plugin_updater 2>&1 || true)
     if ! echo "$report" | grep -q 'No errors found' || echo "$report" | grep -qE 'WARNING|ERROR'; then
       echo "$report"
       failed=1

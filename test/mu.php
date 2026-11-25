@@ -40,6 +40,16 @@ add_action('init', static function (): void {
             global $wpdb;
             echo $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}traffic_observability_queue");
             exit;
+        case 'update':
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+            delete_site_transient('update_plugins');
+            wp_update_plugins();
+            echo json_encode([
+                get_site_transient('update_plugins')->response['trakk/trakk.php'] ?? null,
+                plugins_api('plugin_information', (object) ['slug' => 'trakk']),
+            ]);
+            exit;
         case 'drop':
             global $wpdb;
             $wpdb->query("DROP TABLE {$wpdb->prefix}traffic_observability_queue");
@@ -74,6 +84,19 @@ add_action('init', static function (): void {
             exit;
     }
 });
+
+// wordpress.org without an answer of its own, and a release that is newer.
+add_filter('pre_http_request', static function ($pre, $args, $url) {
+    $answer = static fn(string $body): array => ['headers' => [], 'body' => $body, 'cookies' => [], 'filename' => null,
+        'response' => ['code' => 200, 'message' => 'OK']];
+    if (str_contains($url, 'api.wordpress.org/plugins/update-check')) {
+        return $answer('{"plugins":[],"translations":[],"no_update":[]}');
+    }
+    if (str_ends_with($url, '/releases/latest/download/update.json')) {
+        return $answer('{"version":"99.0.0","requires":"6.5","requires_php":"8.1","tested":"7.1"}');
+    }
+    return $pre;
+}, 10, 3);
 
 add_action('wp_ajax_nopriv_e2e_hello', static function (): void {
     wp_send_json(['hello' => 1]);

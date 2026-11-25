@@ -4,7 +4,7 @@ Tags: traffic, monitoring, bots, security, self-hosted
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: MIT
 License URI: https://opensource.org/license/mit
 
@@ -19,7 +19,8 @@ plugin connects a WordPress site to a Trakk server you run yourself.
 * The server feed reports every request WordPress answers, so bots, failed sign-ins, XML-RPC calls and probes for
   missing pages show up too.
 
-Nothing is loaded and nothing is sent until you enter the address of your Trakk server under Settings → Trakk.
+Nothing is loaded on your pages and nothing about your visitors is sent until you enter the address of your Trakk
+server under Settings → Trakk.
 
 == External services ==
 
@@ -36,6 +37,9 @@ address.
 With the site and a feed key set too, your WordPress server sends it, for every request: time, IP address, method,
 path without the query, status, duration, user agent, referrer without its query, language, client hint and fetch
 metadata headers, the numeric id of a signed-in user, the AJAX action or XML-RPC method, and whether a sign-in failed.
+
+The plugin also asks its GitHub releases (https://github.com/trick77/trakk-wordpress) for a newer version, when
+WordPress looks for updates. GitHub sees your server's address and the plugin's version, nothing about visitors.
 
 What that server keeps, for how long, and the privacy policy that applies to it are yours. Tell your visitors.
 Trakk: https://github.com/trick77/trakk
@@ -58,6 +62,9 @@ can do that, otherwise by WP-Cron. If the Trakk server is down, requests are dro
 Cached pages do not reach WordPress: people on them come in through the script, bots on them do not.
 
 == Changelog ==
+
+= 0.2.0 =
+* Updates from the plugin's GitHub releases.
 
 = 0.1.0 =
 * First release.
