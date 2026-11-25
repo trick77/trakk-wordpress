@@ -13,7 +13,8 @@ defined('ABSPATH') || exit;
 
 // Stored names never carry the product's name.
 const OPTION = 'traffic_observability';
-const OPTION_NEXT = 'traffic_observability_next';
+const OPTION_LEASE = 'traffic_observability_lease';
+const OPTION_PAUSE = 'traffic_observability_pause';
 const OPTION_STATE = 'traffic_observability_state';
 const TABLE = 'traffic_observability_queue';
 const CRON_HOOK = 'traffic_observability_send';
@@ -26,8 +27,10 @@ const MAX_BATCHES = 10;
 // phpcs:disable WordPress.DB.DirectDatabaseQuery -- a table of its own, and rows no cache may hold
 final class Queue
 {
-    // Set when the feed is turned off: the request that did it must not add itself.
+    // The feed was turned off in this request: it must not add itself.
     private static bool $closed = false;
+    // The settings were saved in this request: it loaded the old ones, the next one sends.
+    private static bool $hold = false;
     private string $table;
     private string $options;
 
@@ -39,9 +42,13 @@ final class Queue
         $this->options = $wpdb->options;
     }
 
-    public function install(): void
+    /**
+     * Whether it is there afterwards: the database user may not be allowed to create a table.
+     */
+    public function install(): bool
     {
         global $wpdb;
+        self::$hold = true;
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta("CREATE TABLE {$this->table} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -50,14 +57,32 @@ final class Queue
   PRIMARY KEY  (id),
   KEY at (at)
 ) {$wpdb->get_charset_collate()};");
-        $wpdb->query($wpdb->prepare("INSERT IGNORE INTO %i (option_name, option_value, autoload)
-            VALUES (%s, '0', 'no'), (%s, '{}', 'no')", $this->options, OPTION_NEXT, OPTION_STATE));
-        // The pause after a failure may be the old settings' fault.
         $wpdb->query($wpdb->prepare(
-            "UPDATE %i SET option_value = '0' WHERE option_name = %s",
+            "INSERT IGNORE INTO %i (option_name, option_value, autoload)
+            VALUES (%s, '0', 'no'), (%s, '0', 'no'), (%s, '{}', 'no')",
             $this->options,
-            OPTION_NEXT
+            OPTION_LEASE,
+            OPTION_PAUSE,
+            OPTION_STATE
         ));
+        // The pause after a failure may be the old settings' fault. Never the lease: a sender may hold it.
+        $this->set(OPTION_PAUSE, '0');
+        $this->note(['fails' => 0]);
+        return $this->installed();
+    }
+
+    public function installed(): bool
+    {
+        global $wpdb;
+        $table = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($this->table)));
+        $rows = $wpdb->get_var($wpdb->prepare(
+            'SELECT COUNT(*) FROM %i WHERE option_name IN (%s, %s, %s)',
+            $this->options,
+            OPTION_LEASE,
+            OPTION_PAUSE,
+            OPTION_STATE
+        ));
+        return $table !== null && (int) $rows === 3;
     }
 
     public function uninstall(): void
@@ -65,9 +90,10 @@ final class Queue
         global $wpdb;
         $wpdb->query($wpdb->prepare('DROP TABLE IF EXISTS %i', $this->table));
         $wpdb->query($wpdb->prepare(
-            'DELETE FROM %i WHERE option_name IN (%s, %s)',
+            'DELETE FROM %i WHERE option_name IN (%s, %s, %s)',
             $this->options,
-            OPTION_NEXT,
+            OPTION_LEASE,
+            OPTION_PAUSE,
             OPTION_STATE
         ));
     }
@@ -78,6 +104,8 @@ final class Queue
     public function close(): void
     {
         self::$closed = true;
+        self::$hold = true;
+        wp_clear_scheduled_hook(CRON_HOOK);
         $this->uninstall();
     }
 
@@ -129,17 +157,33 @@ final class Queue
     }
 
     /**
-     * @param array{fails: int, ok: int, error: string, error_at: int, dropped: int} $state
+     * Read again right before it is written: a sender that outlived its lease must not put back an old state.
+     *
+     * @param array{fails?: int, ok?: int, error?: string, error_at?: int} $change
      */
-    private function save(array $state): void
+    private function note(array $change, int $dropped = 0): void
     {
-        global $wpdb;
-        $wpdb->query($wpdb->prepare(
-            'UPDATE %i SET option_value = %s WHERE option_name = %s',
-            $this->options,
-            json_encode($state, JSON_INVALID_UTF8_SUBSTITUTE),
-            OPTION_STATE
-        ));
+        $state = array_merge($this->state(), $change);
+        $state['dropped'] += $dropped;
+        $this->set(OPTION_STATE, (string) json_encode($state, JSON_INVALID_UTF8_SUBSTITUTE));
+    }
+
+    /**
+     * The time before which nobody sends, after a failure.
+     */
+    public function paused_until(): int
+    {
+        return (int) $this->option(OPTION_PAUSE);
+    }
+
+    /**
+     * WP-Cron sends what no request is left to send: one event, once the pause is over.
+     */
+    public function schedule(): void
+    {
+        if (!self::$closed && !wp_next_scheduled(CRON_HOOK)) {
+            wp_schedule_single_event(max(time() + 60, $this->paused_until()), CRON_HOOK);
+        }
     }
 
     /**
@@ -148,7 +192,7 @@ final class Queue
      */
     public function send(Settings $settings): void
     {
-        for ($round = 0; $round < 2 && $this->length() > 0; $round++) {
+        for ($round = 0; $round < 2 && !self::$hold && $this->length() > 0; $round++) {
             if (!$this->drain($settings)) {
                 return;
             }
@@ -164,52 +208,51 @@ final class Queue
         if ($lease === 0) {
             return false;
         }
-        $state = $this->state();
         for ($i = 0; $i < MAX_BATCHES; $i++) {
-            $state['dropped'] += $this->expire();
+            $expired = $this->expire();
+            if ($expired > 0) {
+                $this->note([], $expired);
+            }
             $rows = $this->rows();
             if (!$rows) {
-                $this->save($state);
                 $this->swap($lease, 0);
                 return true;
             }
             [$ids, $body] = batch($settings->site, $rows);
             [$status, $retry_after, $error] = post($settings, $body);
-            $v = verdict($status, $retry_after, $state['fails']);
+            $fails = $this->state()['fails'];
+            $v = verdict($status, $retry_after, $fails);
             if ($v['delete']) {
                 $this->delete($ids);
             }
             if (!$v['ok']) {
-                $state['fails']++;
-                $state['error'] = $error;
-                $state['error_at'] = time();
-                $state['dropped'] += $v['delete'] ? count($ids) : 0;
-                $this->save($state);
-                $this->swap($lease, time() + $v['pause']);
+                $this->note(
+                    ['fails' => $fails + 1, 'error' => $error, 'error_at' => time()],
+                    $v['delete'] ? count($ids) : 0
+                );
+                $this->set(OPTION_PAUSE, (string) (time() + $v['pause']));
+                $this->swap($lease, 0);
                 return false;
             }
-            $state['fails'] = 0;
-            $state['ok'] = time();
+            $this->note(['fails' => 0, 'ok' => time()]);
             $next = max($lease + 1, time() + LEASE);
             if (!$this->swap($lease, $next)) {
                 return false; // it took longer than its lease: another sender has the queue
             }
             $lease = $next;
         }
-        $this->save($state);
         $this->swap($lease, 0);
         return false;
     }
 
     /**
-     * One row holds both the lease and the pause after a failure: the time before which nobody sends. A lease is the
-     * value it wrote, so a sender that lost it cannot release another's. 0: not now.
+     * A lease is the value it wrote, so a sender that lost it cannot release another's. 0: not now.
      */
     private function acquire(): int
     {
         global $wpdb;
         $now = time();
-        if ((int) $this->option(OPTION_NEXT) > $now) {
+        if ($this->paused_until() > $now) {
             return 0;
         }
         $lease = $now + LEASE;
@@ -218,7 +261,7 @@ final class Queue
             WHERE option_name = %s AND CAST(option_value AS UNSIGNED) <= %d',
             $this->options,
             (string) $lease,
-            OPTION_NEXT,
+            OPTION_LEASE,
             $now
         ));
         return $got === 1 ? $lease : 0;
@@ -231,9 +274,20 @@ final class Queue
             'UPDATE %i SET option_value = %s WHERE option_name = %s AND option_value = %s',
             $this->options,
             (string) $to,
-            OPTION_NEXT,
+            OPTION_LEASE,
             (string) $from
         )) === 1;
+    }
+
+    private function set(string $name, string $value): void
+    {
+        global $wpdb;
+        $wpdb->query($wpdb->prepare(
+            'UPDATE %i SET option_value = %s WHERE option_name = %s',
+            $this->options,
+            $value,
+            $name
+        ));
     }
 
     private function option(string $name): string
@@ -309,4 +363,22 @@ function post(Settings $settings, string $body): array
     $why = json_decode(wp_remote_retrieve_body($res), true);
     $why = is_array($why) && is_string($why['detail'] ?? null) ? ': ' . substr($why['detail'], 0, 150) : '';
     return [$status, is_string($ra) ? $ra : '', "HTTP $status$why"];
+}
+
+/**
+ * On this site, or on every one of the network.
+ */
+function each_site(bool $network, callable $do): void
+{
+    if (!$network) {
+        $do();
+        return;
+    }
+    /** @var list<int> $ids */
+    $ids = get_sites(['fields' => 'ids', 'number' => 0]);
+    foreach ($ids as $id) {
+        switch_to_blog($id);
+        $do();
+        restore_current_blog();
+    }
 }
