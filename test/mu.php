@@ -96,9 +96,12 @@ add_filter('pre_http_request', static function ($pre, $args, $url) {
     }
     if (str_ends_with($url, '/releases/latest/download/update.json')) {
         $GLOBALS['e2e_agent'] = $args['user-agent'];
-        $down = new WP_Error('http_request_failed', 'down');
+        $down = $_GET['down'] ?? '';
+        if ($down === 'pulled') {
+            return ['response' => ['code' => 404, 'message' => 'Not Found']] + $answer('');
+        }
         $requires = $_GET['requires'] ?? '6.5';
-        return isset($_GET['down']) ? $down : $answer(
+        return $down !== '' ? new WP_Error('http_request_failed', 'down') : $answer(
             '{"version":"99.0.0","requires":"' . $requires . '","requires_php":"8.1","tested":"7.1"}'
         );
     }
