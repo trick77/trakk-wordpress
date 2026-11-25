@@ -41,6 +41,7 @@ if (is_admin()) {
     require __DIR__ . '/includes/settings.php';
     add_action('admin_menu', __NAMESPACE__ . '\settings_menu');
     add_action('admin_init', __NAMESPACE__ . '\settings_register');
+    add_filter('option_page_capability_' . PAGE, __NAMESPACE__ . '\settings_capability');
     add_action('wp_ajax_' . TEST_ACTION, __NAMESPACE__ . '\settings_test');
     add_filter('plugin_action_links_' . plugin_basename(__FILE__), __NAMESPACE__ . '\settings_link');
 }

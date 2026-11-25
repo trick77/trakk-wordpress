@@ -23,6 +23,8 @@ const QUEUE_MAX = 5000;
 const LEASE = 60;
 const TIMEOUT = 10;
 const MAX_BATCHES = 10;
+const CRON_DELAY = 60;
+const CRON_NET = 5 * 60;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery -- a table of its own, and rows no cache may hold
 final class Queue
@@ -171,18 +173,20 @@ final class Queue
     /**
      * The time before which nobody sends, after a failure.
      */
-    public function paused_until(): int
+    private function paused_until(): int
     {
         return (int) $this->option(OPTION_PAUSE);
     }
 
     /**
-     * WP-Cron sends what no request is left to send: one event, once the pause is over.
+     * WP-Cron sends where no request can outlive its answer, and elsewhere what one left behind: a pause, a sender
+     * that was killed. One event at a time.
      */
     public function schedule(): void
     {
         if (!self::$closed && !wp_next_scheduled(CRON_HOOK)) {
-            wp_schedule_single_event(max(time() + 60, $this->paused_until()), CRON_HOOK);
+            $delay = finishes() ? CRON_NET : CRON_DELAY;
+            wp_schedule_single_event(max(time() + $delay, $this->paused_until()), CRON_HOOK);
         }
     }
 
@@ -230,6 +234,10 @@ final class Queue
                     ['fails' => $fails + 1, 'error' => $error, 'error_at' => time()],
                     $v['delete'] ? count($ids) : 0
                 );
+                if ($v['delete']) {
+                    // phpcs:ignore WordPress.PHP.DevelopmentFunctions -- a wrong key loses requests until somebody sees it
+                    error_log('Trakk: batch of ' . count($ids) . " requests refused and dropped: $error");
+                }
                 $this->set(OPTION_PAUSE, (string) (time() + $v['pause']));
                 $this->swap($lease, 0);
                 return false;

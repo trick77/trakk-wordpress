@@ -213,6 +213,9 @@ check('the key goes to no other server', str_contains($r['body'], 'Enter the fee
 $html = save(['url' => 'http://stub:8080', 'key' => ''] + $ok);
 check('nor is that saved', str_contains($html, 'Enter the feed key again')
     && str_contains($html, 'value="' . STUB . '"'), strip_tags($html));
+$html = save(['url' => 'http://stub:8080', 'key' => 'too short'] + $ok);
+check('nor with a key that is refused', str_contains($html, '16 to 256 characters')
+    && str_contains($html, 'value="' . STUB . '"'), strip_tags($html));
 $r = $button(['url' => 'http://nothing.wp.test'] + $ok);
 check('it tests what was typed', str_contains($r['body'], 'No answer'), $r);
 $r = $button(['url' => 'http://nginx'] + $ok);
@@ -344,7 +347,8 @@ stub('/control?status=503');
 $one('/kept');
 flush_queue();
 check('503 keeps the batch', (int) control('length') > 0);
-check('WP-Cron tries again if nobody comes', (int) control('scheduled') > 0, control('scheduled'));
+$due = (int) control('scheduled');
+check('WP-Cron tries again if nobody comes', $due > 0 && $due <= 300, $due);
 $n = count(records());
 $one('/kept-too');
 flush_queue();

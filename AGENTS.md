@@ -15,13 +15,11 @@ here (user: ship has nothing to do with PHP); CI is the gate.
 - `route` stays empty: Trakk's path rules name requests and page views alike.
 
 ## Traps
-- `$_SERVER` is slashed after the plugins load (`wp_magic_quotes`): `Sec-CH-UA` came with backslashes. Read at load.
 - The object cache is closed before the last shutdown functions, `exit` in one ends all later ones.
-- `$wpdb->insert()` runs `SHOW FULL COLUMNS` once per request.
-- wp-cron.php deletes `doing_cron` before shutdown: the own-call check is at load.
-- Galera skips auto-increment ids: no `MAX(id) - MIN(id)` as a length.
-- Turning the feed off: that request would queue itself afterwards (`Queue::$closed`).
-- Plugin Check (wordpress.org's reviewers run it) must stay clean: `wp plugin check trakk`.
+- `wp_schedule_single_event` writes the whole cron list as the request read it: never after a slow POST.
+- A key belongs to one Trakk: a changed URL needs it typed again. A malformed one once kept the old key with the new
+  URL.
+- Plugin Check (wordpress.org's reviewers run it) must stay clean; PHP-CS-Fixer may move a `phpcs:ignore` off its line.
 
 ## Workflow
 - Commit subjects Go style: `area: what`.

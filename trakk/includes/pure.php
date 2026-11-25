@@ -1,7 +1,7 @@
 <?php
 
 /**
- * The logic without WordPress's state: test/unit.php runs it alone.
+ * The logic without WordPress's state: test/unit runs it alone.
  */
 
 namespace Trakk;
@@ -18,7 +18,8 @@ const MAX_AGE = 55 * 60;
 const REFUSED_PAUSE = 60;
 const RETRY_FIRST = 5;
 const RETRY_MAX = 15 * 60;
-const RETRY_AFTER_MAX = 60 * 60;
+// Well below MAX_AGE: what waits out a longer one would be too old to send.
+const RETRY_AFTER_MAX = 30 * 60;
 
 // The feed's limits per field in bytes (Trakk's README, "Server feed"). op and err are names.
 const LIMITS = [
@@ -107,14 +108,20 @@ function is_loopback(string $addr): bool
 }
 
 /**
- * The server's own request: from loopback, and not on behalf of somebody else. The header alone is the client's word
- * where the proxy can be gone around.
+ * The server's own request: from loopback, and on behalf of nobody else. Whatever the trusted proxies: a proxy on the
+ * same host is loopback too, and an entry of the header may be the client's own word.
  *
  * @param array<string, mixed> $server
  */
-function is_local(array $server, int $hops): bool
+function is_local(array $server): bool
 {
-    return is_loopback(client_addr($server, 0)) && is_loopback(client_addr($server, $hops));
+    $xff = $server['HTTP_X_FORWARDED_FOR'] ?? '';
+    foreach (is_string($xff) && trim($xff) !== '' ? explode(',', $xff) : [] as $entry) {
+        if (!is_loopback(parse_addr($entry))) {
+            return false;
+        }
+    }
+    return is_loopback(client_addr($server, 0));
 }
 
 /**

@@ -12,9 +12,17 @@ const TEST_ACTION = 'traffic_observability_test';
 const NO_QUEUE = 'The server feed has no table to wait in: the database refused it or something removed it. Save again;'
     . ' the database user needs the CREATE privilege.';
 
+/**
+ * The URL becomes a script on every page: on a network no site's own admin may add one.
+ */
+function settings_capability(): string
+{
+    return is_multisite() ? 'manage_network_options' : 'manage_options';
+}
+
 function settings_menu(): void
 {
-    $page = add_options_page('Trakk', 'Trakk', 'manage_options', PAGE, __NAMESPACE__ . '\settings_page');
+    $page = add_options_page('Trakk', 'Trakk', settings_capability(), PAGE, __NAMESPACE__ . '\settings_page');
     add_action("load-$page", static function (): void {
         wp_enqueue_script(
             'trakk-settings',
@@ -68,14 +76,14 @@ function settings_read(mixed $form, Settings $old): array
     $key = $text('key');
     if ($key === '') {
         $key = $text('key_clear') === '' ? $old->key : '';
-        if ($key !== '' && ($url ?? '') !== '' && $url !== $old->url) {
-            // A key is one server's secret: not sent to another on the strength of a typed address.
-            $url = $old->url;
-            $faults['key'] = 'Enter the feed key again: the URL is another server\'s.';
-        }
     } elseif (!preg_match('/^[\x21-\x7e]{16,256}$/', $key)) {
         $key = $old->key;
         $faults['key'] = 'The feed key is 16 to 256 characters without spaces.';
+    }
+    if ($key !== '' && $key !== $text('key') && ($url ?? '') !== '' && $url !== $old->url) {
+        // A key is one server's secret: not sent to another on the strength of a typed address.
+        $url = $old->url;
+        $faults['key'] ??= 'Enter the feed key again: the URL is another server\'s.';
     }
     $hops = filter_var(
         $text('hops'),
@@ -165,7 +173,7 @@ function test_lines(Settings $s): array
 function settings_test(): void
 {
     check_ajax_referer(TEST_ACTION, 'nonce');
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can(settings_capability())) {
         wp_send_json_error(null, 403);
     }
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- settings_read() takes what is valid only
@@ -191,6 +199,10 @@ function settings_warnings(Settings $s): array
     } elseif ($s->site !== '' && $s->site !== $home) {
         $out[] = "The site is {$s->site}, but the pages are on $home. With and without www are two sites in Trakk.";
     }
+    if ($s->feed() && is_local(request_server())) {
+        $out[] = 'This request came from the server itself, and such requests are not reported. If you are not on the'
+            . ' server, its proxy sends no X-Forwarded-For.';
+    }
     if ($s->feed() && !(new Queue())->installed()) {
         $out[] = NO_QUEUE;
     }
@@ -202,7 +214,7 @@ function settings_warnings(Settings $s): array
 
 function settings_page(): void
 {
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can(settings_capability())) {
         return;
     }
     $s = Settings::load();

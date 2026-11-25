@@ -80,16 +80,17 @@ final class PureTest extends TestCase
         self::assertSame($want, is_loopback($addr));
     }
 
-    #[TestWith(['127.0.0.1', null, 0, true])]
-    #[TestWith(['127.0.0.1', null, 1, true])]
-    #[TestWith(['127.0.0.1', '127.0.0.1', 1, true])]
-    #[TestWith(['127.0.0.1', '203.0.113.7', 1, false])] // a proxy on the same host
-    #[TestWith(['203.0.113.7', '127.0.0.1', 1, false])] // around the proxy
-    #[TestWith(['203.0.113.7', '::1', 1, false])]
-    public function testIsLocal(string $peer, ?string $xff, int $hops, bool $want): void
+    #[TestWith(['127.0.0.1', null, true])]
+    #[TestWith(['127.0.0.1', '', true])]
+    #[TestWith(['::1', '127.0.0.1, ::1', true])]
+    #[TestWith(['127.0.0.1', '203.0.113.7', false])] // a proxy on the same host
+    #[TestWith(['127.0.0.1', '127.0.0.1, 203.0.113.7', false])] // and a client that forged an entry
+    #[TestWith(['127.0.0.1', 'unknown', false])]
+    #[TestWith(['203.0.113.7', '127.0.0.1', false])] // around the proxy
+    public function testIsLocal(string $peer, ?string $xff, bool $want): void
     {
         $server = ['REMOTE_ADDR' => $peer] + ($xff === null ? [] : ['HTTP_X_FORWARDED_FOR' => $xff]);
-        self::assertSame($want, is_local($server, $hops));
+        self::assertSame($want, is_local($server));
     }
 
     #[TestWith(['10.0.0.1', true])]
@@ -233,7 +234,7 @@ final class PureTest extends TestCase
     #[TestWith(['', 50, 900])] // to fifteen minutes
     #[TestWith([' 7 ', 5, 7])] // Retry-After
     #[TestWith(['0', 5, 1])] // at least a second
-    #[TestWith(['999999', 0, 3600])] // at most an hour
+    #[TestWith(['999999', 0, 1800])] // at most half an hour
     #[TestWith(['Wed, 21 Oct 2026 07:28:00 GMT', 1, 10])] // a date is the back-off
     public function testPause(string $retryAfter, int $fails, int $want): void
     {
