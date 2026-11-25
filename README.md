@@ -38,7 +38,8 @@ Without settings it loads nothing on the pages and sends nothing about visitors.
 ### Updates
 
 From 0.2.0 on WordPress offers new releases like any plugin's, with one click or automatically (Plugins → Enable
-auto-updates): the plugin asks this repository's releases. An older version is updated by uploading the ZIP once.
+auto-updates): the plugin asks this repository's releases. An older version is updated by uploading the ZIP once. The plugin must be active, in a folder named `trakk`, and on
+a network active on the main site or for the network: WordPress looks for updates there.
 
 ### Behind a proxy
 

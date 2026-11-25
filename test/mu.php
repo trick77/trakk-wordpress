@@ -48,6 +48,8 @@ add_action('init', static function (): void {
             echo json_encode([
                 get_site_transient('update_plugins')->response['trakk/trakk.php'] ?? null,
                 plugins_api('plugin_information', (object) ['slug' => 'trakk']),
+                get_site_transient('update_plugins')->no_update['trakk/trakk.php'] ?? null,
+                $GLOBALS['e2e_agent'],
             ]);
             exit;
         case 'drop':
@@ -93,7 +95,12 @@ add_filter('pre_http_request', static function ($pre, $args, $url) {
         return $answer('{"plugins":[],"translations":[],"no_update":[]}');
     }
     if (str_ends_with($url, '/releases/latest/download/update.json')) {
-        return $answer('{"version":"99.0.0","requires":"6.5","requires_php":"8.1","tested":"7.1"}');
+        $GLOBALS['e2e_agent'] = $args['user-agent'];
+        $down = new WP_Error('http_request_failed', 'down');
+        $requires = $_GET['requires'] ?? '6.5';
+        return isset($_GET['down']) ? $down : $answer(
+            '{"version":"99.0.0","requires":"' . $requires . '","requires_php":"8.1","tested":"7.1"}'
+        );
     }
     return $pre;
 }, 10, 3);

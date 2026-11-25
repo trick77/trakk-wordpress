@@ -233,8 +233,8 @@ function settings_page(): void
                     <td>
                         <input id="trakk-url" name="<?php echo esc_attr(OPTION); ?>[url]" type="url" class="regular-text"
                             value="<?php echo esc_attr($s->url); ?>" placeholder="https://trakk.example.com">
-                        <p class="description">Turns on the browser script on this site's pages. Empty: nothing is
-                            loaded and nothing is sent.</p>
+                        <p class="description">Turns on the browser script on this site's pages. Empty: they load
+                            nothing and nothing is reported.</p>
                     </td>
                 </tr>
                 <tr>
